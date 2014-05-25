@@ -1,7 +1,12 @@
 package cnf;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileOutputStream;
 import java.io.FileReader;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.util.HashSet;
 import java.util.Iterator;
 
@@ -22,10 +27,10 @@ public class CNF2SMTLIBv2Converter {
 
 	private String convertLiteral(String lit) {
 		int nlit = Integer.parseInt(lit);
-		
-		if(nlit == 0)
+
+		if (nlit == 0)
 			return "";
-		
+
 		int atom = Math.abs(nlit);
 		vars.add(atom);
 		if (nlit == 0)
@@ -40,7 +45,7 @@ public class CNF2SMTLIBv2Converter {
 	 * Convert a clause in CNF to a clause in SMTLIBv2
 	 */
 	private String convertClause(String cnf) {
-		String smt = " ( or ( ";
+		String smt = " ( or ";
 		String lits[] = cnf.trim().split("\\s+");
 		for (String lit : lits) {
 			smt = smt + convertLiteral(lit) + " ";
@@ -64,11 +69,11 @@ public class CNF2SMTLIBv2Converter {
 		}
 	}
 
-	public String convertDimacs(String filename) {
+	public String convertDimacs(String cnf, String smtlib2) {
 
 		String smt2 = null;
 
-		try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
+		try (BufferedReader br = new BufferedReader(new FileReader(cnf))) {
 			StringBuilder sb = new StringBuilder();
 			String line = br.readLine();
 
@@ -124,12 +129,14 @@ public class CNF2SMTLIBv2Converter {
 			}
 
 			sb.append("))\n");
+			sb.append("\n( check-sat )");
+			sb.append("\n( get-model )");
 
 			check();
 
 			String formula = sb.toString();
 
-			System.out.println(getSMTLIB2Info() + getDeclaration() + formula);
+			writeToFile(smtlib2, getSMTLIB2Info() + getDeclaration() + formula);
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -137,28 +144,45 @@ public class CNF2SMTLIBv2Converter {
 
 		return smt2;
 	}
-	
-	private String getSMTLIB2Info(){
+
+	private String getSMTLIB2Info() {
 		String str = "";
 		str += "( set-option :produce-models true )\n";
 		str += "( set-logic QF_UF )\n\n";
 		return str;
 	}
-	
-	private String getDeclaration(){
+
+	private String getDeclaration() {
 		StringBuilder sb = new StringBuilder();
 		Iterator<Integer> iter = vars.iterator();
-		while(iter.hasNext()){
+		while (iter.hasNext()) {
 			int var = iter.next();
-			String decl = "( declare-fun p" + var + " () Bool )\n"; 
+			String decl = "( declare-fun p" + var + " () Bool )\n";
 			sb.append(decl);
 		}
 		sb.append("\n");
 		return sb.toString();
 	}
 
+	private void writeToFile(String filename, String content) {
+		Writer writer = null;
+
+		try {
+			writer = new BufferedWriter(new OutputStreamWriter(
+					new FileOutputStream(filename), "utf-8"));
+			writer.write(content);
+		} catch (IOException ex) {
+			// report
+		} finally {
+			try {
+				writer.close();
+			} catch (Exception ex) {
+			}
+		}
+	}
+
 	public static void main(String[] args) {
 		CNF2SMTLIBv2Converter converter = new CNF2SMTLIBv2Converter();
-		converter.convertDimacs("test/test.cnf");
+		converter.convertDimacs("test/test.cnf", "test/test.smt2");
 	}
 }
